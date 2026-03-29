@@ -45,7 +45,7 @@ void SetBlocker(const string reason,const string level)
    g_state.blocker_reason=reason;
    if(g_last_logged_blocker!=reason)
      {
-      XAUJournal::Log(level,reason);
+      XAUJournal_Log(level,reason);
       g_last_logged_blocker=reason;
      }
   }
@@ -55,21 +55,21 @@ int OnInit()
    ResetRuntimeState();
    g_symbol=(InpSymbol=="" ? _Symbol : InpSymbol);
 
-   if(!XAUJournal::Init(InpEnableFileLogs,g_symbol,InpMagic))
+   if(!XAUJournal_Init(InpEnableFileLogs,g_symbol,InpMagic))
       return(INIT_FAILED);
 
-   XAUJournal::Log("INFO",StringFormat("Initializing on chart=%s trade_symbol=%s",_Symbol,g_symbol));
+   XAUJournal_Log("INFO",StringFormat("Initializing on chart=%s trade_symbol=%s",_Symbol,g_symbol));
 
    if(Bars(g_symbol,InpSignalTF)<(InpBreakoutLookback+XAU_MIN_HISTORY_BUFFER) || Bars(g_symbol,InpRegimeTF)<(InpRegimeEMAPeriod+XAU_MIN_HISTORY_BUFFER))
      {
-      XAUJournal::Log("ERROR","Insufficient history for strategy startup");
+      XAUJournal_Log("ERROR","Insufficient history for strategy startup");
       return(INIT_FAILED);
      }
 
    string err="";
    if(!XAU_IndicatorInit(g_symbol,InpRegimeTF,InpRegimeEMAPeriod,InpSignalTF,InpATRPeriod,g_indicators,err))
      {
-      XAUJournal::Log("ERROR",err);
+      XAUJournal_Log("ERROR",err);
       return(INIT_FAILED);
      }
 
@@ -82,13 +82,13 @@ int OnInit()
      {
       g_state.integrity_violation=true;
       g_state.blocker_reason=init_integrity_reason;
-      XAUJournal::Log("ERROR",init_integrity_reason);
+      XAUJournal_Log("ERROR",init_integrity_reason);
       return(INIT_SUCCEEDED);
      }
    if(snap.found)
      {
       XAU_RebuildTradeStateFromPosition(g_symbol,InpSignalTF,snap,g_state.trade);
-      XAUJournal::Log("INFO",StringFormat("Recovered live position ticket=%I64u direction=%s",
+      XAUJournal_Log("INFO",StringFormat("Recovered live position ticket=%I64u direction=%s",
                                             snap.ticket,
                                             XAU_SignalToString(g_state.trade.direction)));
      }
@@ -106,7 +106,7 @@ void OnDeinit(const int reason)
    if(InpEnableChartPanel)
       Comment("");
    XAU_IndicatorRelease(g_indicators);
-   XAUJournal::Shutdown();
+   XAUJournal_Shutdown();
   }
 
 void OnTradeTransaction(const MqlTradeTransaction &trans,const MqlTradeRequest &request,const MqlTradeResult &result)
@@ -114,7 +114,7 @@ void OnTradeTransaction(const MqlTradeTransaction &trans,const MqlTradeRequest &
    if(trans.symbol!=g_symbol)
       return;
 
-   XAUJournal::Log("INFO",StringFormat("Trade transaction type=%d order=%I64u deal=%I64u retcode=%u",
+   XAUJournal_Log("INFO",StringFormat("Trade transaction type=%d order=%I64u deal=%I64u retcode=%u",
                                          trans.type,result.order,result.deal,result.retcode));
   }
 
@@ -166,13 +166,13 @@ void ProcessBar()
          string close_reason="";
          if(XAU_ClosePosition(g_trade,g_symbol,InpSlippagePoints,close_reason))
            {
-            XAUJournal::Log("WARN",StringFormat("Daily kill close executed: day_dd=%.2f%%",dd_pct));
+            XAUJournal_Log("WARN",StringFormat("Daily kill close executed: day_dd=%.2f%%",dd_pct));
             g_state.last_exit_bar_time=iTime(g_symbol,InpSignalTF,0);
             XAU_ClearTradeState(g_state.trade);
             exited_this_cycle=true;
            }
          else
-            XAUJournal::Log("ERROR",StringFormat("Daily kill close failed: %s",close_reason));
+            XAUJournal_Log("ERROR",StringFormat("Daily kill close failed: %s",close_reason));
         }
 
       if(!exited_this_cycle && InpExitOnRegimeFlip)
@@ -184,13 +184,13 @@ void ProcessBar()
             string close_reason="";
             if(XAU_ClosePosition(g_trade,g_symbol,InpSlippagePoints,close_reason))
               {
-               XAUJournal::Log("INFO",StringFormat("Closed on regime flip (%s)",XAU_RegimeToString(g_state.regime)));
+               XAUJournal_Log("INFO",StringFormat("Closed on regime flip (%s)",XAU_RegimeToString(g_state.regime)));
                g_state.last_exit_bar_time=iTime(g_symbol,InpSignalTF,0);
                XAU_ClearTradeState(g_state.trade);
                exited_this_cycle=true;
               }
             else
-               XAUJournal::Log("ERROR",StringFormat("Regime flip close failed: %s",close_reason));
+               XAUJournal_Log("ERROR",StringFormat("Regime flip close failed: %s",close_reason));
            }
         }
 
@@ -218,7 +218,7 @@ void ProcessBar()
                {
                 if(g_last_trailing_skip!=trailing_skip)
                   {
-                   XAUJournal::Log("INFO",trailing_skip);
+                   XAUJournal_Log("INFO",trailing_skip);
                    g_last_trailing_skip=trailing_skip;
                   }
                }
@@ -229,10 +229,10 @@ void ProcessBar()
                 if(XAU_ModifyStop(g_trade,g_symbol,normalized_target_sl,sl_reason))
                  {
                   g_state.trade.stop_loss=normalized_target_sl;
-                  XAUJournal::Log("INFO",StringFormat("Trailing SL updated to %.5f",normalized_target_sl));
+                  XAUJournal_Log("INFO",StringFormat("Trailing SL updated to %.5f",normalized_target_sl));
                  }
                 else
-                  XAUJournal::Log("ERROR",StringFormat("Trailing modify failed: %s",sl_reason));
+                  XAUJournal_Log("ERROR",StringFormat("Trailing modify failed: %s",sl_reason));
                }
            }
         }
@@ -324,14 +324,14 @@ void ProcessBar()
       return;
      }
 
-   XAUJournal::Log("INFO",StringFormat("Entry setup signal=%s regime=%s close1=%.5f breakoutH=%.5f breakoutL=%.5f atr=%.5f stop=%.5f vol=%.2f riskCash=%.2f",
+   XAUJournal_Log("INFO",StringFormat("Entry setup signal=%s regime=%s close1=%.5f breakoutH=%.5f breakoutL=%.5f atr=%.5f stop=%.5f vol=%.2f riskCash=%.2f",
                                          XAU_SignalToString(sig.signal),XAU_RegimeToString(g_state.regime),
                                          sig.signal_close,sig.breakout_high,sig.breakout_low,atr1,stop_price,volume,risk_target));
 
    string open_reason="";
    if(!XAU_OpenPosition(g_trade,g_symbol,order_type,volume,stop_price,"XAUTrend",open_reason))
      {
-      XAUJournal::Log("ERROR",open_reason);
+      XAUJournal_Log("ERROR",open_reason);
       SetBlocker(open_reason,"ERROR");
       return;
      }

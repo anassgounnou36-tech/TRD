@@ -1,4 +1,5 @@
-#pragma once
+#ifndef __INDICATORENGINE_MQH__
+#define __INDICATORENGINE_MQH__
 
 #include "Types.mqh"
 
@@ -73,3 +74,5 @@ bool XAU_GetATR(const XAUIndicatorState &state,const int shift,double &atr_value
    atr_value=buffer[0];
    return(atr_value>0.0);
   }
+
+#endif // __INDICATORENGINE_MQH__

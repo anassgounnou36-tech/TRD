@@ -1,4 +1,5 @@
-#pragma once
+#ifndef __TYPES_MQH__
+#define __TYPES_MQH__
 
 enum ENUM_XAU_REGIME
   {
@@ -67,3 +68,5 @@ struct XAUPositionSnapshot
    double              sl;
    datetime            time_open;
   };
+
+#endif // __TYPES_MQH__

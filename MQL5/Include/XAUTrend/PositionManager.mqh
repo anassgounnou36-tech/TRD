@@ -1,4 +1,5 @@
-#pragma once
+#ifndef __POSITIONMANAGER_MQH__
+#define __POSITIONMANAGER_MQH__
 
 #include "Types.mqh"
 #include "BarUtils.mqh"
@@ -140,3 +141,5 @@ double XAU_ComputeTrailingStop(const string symbol,
 
    return(NormalizeDouble(trade.lowest_since_entry+trail_atr*atr,digits));
   }
+
+#endif // __POSITIONMANAGER_MQH__

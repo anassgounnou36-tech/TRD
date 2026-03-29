@@ -1,4 +1,5 @@
-#pragma once
+#ifndef __REGIMEFILTER_MQH__
+#define __REGIMEFILTER_MQH__
 
 #include "Types.mqh"
 #include "IndicatorEngine.mqh"
@@ -45,3 +46,5 @@ ENUM_XAU_REGIME XAU_ComputeRegime(const string symbol,
   {
    return(XAU_ComputeRegimeAtShift(symbol,regime_tf,indicators,1,reason));
   }
+
+#endif // __REGIMEFILTER_MQH__

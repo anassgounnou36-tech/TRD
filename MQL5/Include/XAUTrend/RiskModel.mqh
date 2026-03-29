@@ -1,4 +1,5 @@
-#pragma once
+#ifndef __RISKMODEL_MQH__
+#define __RISKMODEL_MQH__
 
 #include "Types.mqh"
 #include "BarUtils.mqh"
@@ -127,3 +128,5 @@ double XAU_ComputeRiskVolume(const string symbol,
 
    return(volume);
   }
+
+#endif // __RISKMODEL_MQH__

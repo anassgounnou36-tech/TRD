@@ -1,4 +1,5 @@
-#pragma once
+#ifndef __DIAGNOSTICS_MQH__
+#define __DIAGNOSTICS_MQH__
 
 #include "Types.mqh"
 
@@ -64,3 +65,5 @@ string XAU_SignalToString(const ENUM_XAU_SIGNAL signal)
       return("SHORT");
    return("NONE");
   }
+
+#endif // __DIAGNOSTICS_MQH__

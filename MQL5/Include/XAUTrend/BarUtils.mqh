@@ -1,4 +1,5 @@
-#pragma once
+#ifndef __BARUTILS_MQH__
+#define __BARUTILS_MQH__
 
 bool XAU_IsNewBar(const string symbol,const ENUM_TIMEFRAMES tf,datetime &last_time,datetime &new_bar_time)
   {
@@ -71,3 +72,5 @@ bool XAU_IsWithinRolloverWindow(const datetime now,const int start_hour,const in
 
    return(current_minutes>=start_minutes || current_minutes<=end_minutes);
   }
+
+#endif // __BARUTILS_MQH__

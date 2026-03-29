@@ -1,4 +1,5 @@
-#pragma once
+#ifndef __EXECUTIONENGINE_MQH__
+#define __EXECUTIONENGINE_MQH__
 
 #include <Trade/Trade.mqh>
 
@@ -255,3 +256,5 @@ bool XAU_ClosePosition(CTrade &trade,const string symbol,const int deviation_poi
      }
    return(true);
   }
+
+#endif // __EXECUTIONENGINE_MQH__

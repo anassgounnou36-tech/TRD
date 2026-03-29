@@ -1,4 +1,5 @@
-#pragma once
+#ifndef __CHARTPANEL_MQH__
+#define __CHARTPANEL_MQH__
 
 #include "Types.mqh"
 #include "Diagnostics.mqh"
@@ -23,3 +24,5 @@ void XAU_UpdateChartPanel(const bool enabled,
    lines+=StringFormat("Blocker: %s",(state.blocker_reason==""?"none":state.blocker_reason));
    Comment(lines);
   }
+
+#endif // __CHARTPANEL_MQH__

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef __BREAKOUTSIGNAL_MQH__
+#define __BREAKOUTSIGNAL_MQH__
 
 #include "Types.mqh"
 #include "BarUtils.mqh"
@@ -42,3 +43,5 @@ XAUSignalDecision XAU_EvaluateBreakoutSignal(const string symbol,
   {
    return(XAU_EvaluateBreakoutSignalAtShift(symbol,signal_tf,regime,1,lookback,atr_value,buffer_frac));
   }
+
+#endif // __BREAKOUTSIGNAL_MQH__
