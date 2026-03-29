@@ -5,9 +5,35 @@
 bool XAU_IsTradeEnvironmentReady(const string symbol,string &reason)
   {
    reason="";
+
+   if(!TerminalInfoInteger(TERMINAL_CONNECTED))
+     {
+      reason="Terminal not connected";
+      return(false);
+     }
+
+   if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED))
+     {
+      reason="Terminal trading not allowed";
+      return(false);
+     }
+
+   if(!MQLInfoInteger(MQL_TRADE_ALLOWED))
+     {
+      reason="MQL trading not allowed";
+      return(false);
+     }
+
    if(!AccountInfoInteger(ACCOUNT_TRADE_ALLOWED))
      {
       reason="Account trading not allowed";
+      return(false);
+     }
+
+   long selected=0;
+   if(!SymbolInfoInteger(symbol,SYMBOL_SELECT,selected) || selected==0)
+     {
+      reason="Symbol not selected in Market Watch";
       return(false);
      }
 

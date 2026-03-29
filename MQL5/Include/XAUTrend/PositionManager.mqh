@@ -38,6 +38,16 @@ bool XAU_FindOpenPosition(const string symbol,const ulong magic,XAUPositionSnaps
    return(snapshot.found);
   }
 
+bool XAU_HasPositionIntegrityViolation(const XAUPositionSnapshot &snapshot,string &reason)
+  {
+   reason="";
+   if(snapshot.count<=1)
+      return(false);
+
+   reason=StringFormat("INTEGRITY VIOLATION: %d positions found for symbol+magic",snapshot.count);
+   return(true);
+  }
+
 void XAU_RebuildTradeStateFromPosition(const string symbol,
                                        const ENUM_TIMEFRAMES signal_tf,
                                        const XAUPositionSnapshot &snapshot,

@@ -32,5 +32,4 @@ A single-strategy, pure MQL5 trend-following EA for gold symbols (default chart 
 - Broker symbol suffixes supported by using configurable symbol defaulting to chart symbol
 
 ## Known limitations
-- Bar-audit script computes current regime from latest completed H4 context (not full historical reconstruction by timestamp)
 - Chart panel is informational only and not required for strategy logic

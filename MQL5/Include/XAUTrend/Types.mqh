@@ -35,6 +35,7 @@ struct XAURuntimeState
    datetime          day_start_time;
    double            day_start_equity;
    bool              trading_suspended_for_day;
+   bool              integrity_violation;
    ENUM_XAU_REGIME   regime;
    string            blocker_reason;
    XAUTradeState     trade;

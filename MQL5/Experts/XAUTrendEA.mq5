@@ -22,6 +22,8 @@ XAURuntimeState   g_state;
 XAUIndicatorState g_indicators;
 string            g_symbol;
 const int         XAU_MIN_HISTORY_BUFFER=20;
+string            g_last_logged_blocker="";
+string            g_last_trailing_skip="";
 
 void ResetRuntimeState()
   {
@@ -32,9 +34,20 @@ void ResetRuntimeState()
    g_state.day_start_time=0;
    g_state.day_start_equity=0.0;
    g_state.trading_suspended_for_day=false;
+   g_state.integrity_violation=false;
    g_state.regime=XAU_REGIME_NEUTRAL;
    g_state.blocker_reason="";
    XAU_ClearTradeState(g_state.trade);
+  }
+
+void SetBlocker(const string reason,const string level)
+  {
+   g_state.blocker_reason=reason;
+   if(g_last_logged_blocker!=reason)
+     {
+      XAUJournal::Log(level,reason);
+      g_last_logged_blocker=reason;
+     }
   }
 
 int OnInit()
@@ -64,6 +77,14 @@ int OnInit()
 
    XAUPositionSnapshot snap;
    XAU_FindOpenPosition(g_symbol,InpMagic,snap);
+   string init_integrity_reason="";
+   if(XAU_HasPositionIntegrityViolation(snap,init_integrity_reason))
+     {
+      g_state.integrity_violation=true;
+      g_state.blocker_reason=init_integrity_reason;
+      XAUJournal::Log("ERROR",init_integrity_reason);
+      return(INIT_SUCCEEDED);
+     }
    if(snap.found)
      {
       XAU_RebuildTradeStateFromPosition(g_symbol,InpSignalTF,snap,g_state.trade);
@@ -106,16 +127,14 @@ void ProcessBar()
    string env_reason="";
    if(!XAU_IsTradeEnvironmentReady(g_symbol,env_reason))
      {
-      g_state.blocker_reason=env_reason;
-      XAUJournal::Log("WARN",env_reason);
+      SetBlocker(env_reason,"WARN");
       return;
      }
 
    double atr1=0.0;
    if(!XAU_GetATR(g_indicators,1,atr1) || atr1<=0.0)
      {
-      g_state.blocker_reason="ATR invalid";
-      XAUJournal::Log("WARN","ATR invalid or unavailable");
+      SetBlocker("ATR invalid or unavailable","WARN");
       return;
      }
 
@@ -127,6 +146,14 @@ void ProcessBar()
 
    XAUPositionSnapshot snap;
    XAU_FindOpenPosition(g_symbol,InpMagic,snap);
+   string integrity_reason="";
+   if(XAU_HasPositionIntegrityViolation(snap,integrity_reason))
+     {
+      g_state.integrity_violation=true;
+      SetBlocker(integrity_reason,"ERROR");
+      return;
+     }
+   g_state.integrity_violation=false;
    g_state.trade.has_position=snap.found;
    if(snap.found)
       XAU_RebuildTradeStateFromPosition(g_symbol,InpSignalTF,snap,g_state.trade);
@@ -178,16 +205,35 @@ void ProcessBar()
          else if(g_state.trade.direction==XAU_SIGNAL_SHORT)
             target_sl=(g_state.trade.stop_loss==0.0 ? trail_stop : MathMin(g_state.trade.stop_loss,trail_stop));
 
-         if(target_sl>0.0 && target_sl!=g_state.trade.stop_loss)
+         if(target_sl>0.0)
            {
-            string sl_reason="";
-            if(XAU_ModifyStop(g_trade,g_symbol,target_sl,sl_reason))
-              {
-               g_state.trade.stop_loss=target_sl;
-               XAUJournal::Log("INFO",StringFormat("Trailing SL updated to %.5f",target_sl));
-              }
+            double normalized_target_sl=0.0;
+            string trailing_skip="";
+            if(!XAU_IsStopModificationAllowed(g_symbol,
+                                               (g_state.trade.direction==XAU_SIGNAL_LONG ? POSITION_TYPE_BUY : POSITION_TYPE_SELL),
+                                               g_state.trade.stop_loss,
+                                               target_sl,
+                                               normalized_target_sl,
+                                               trailing_skip))
+               {
+                if(g_last_trailing_skip!=trailing_skip)
+                  {
+                   XAUJournal::Log("INFO",trailing_skip);
+                   g_last_trailing_skip=trailing_skip;
+                  }
+               }
             else
-               XAUJournal::Log("ERROR",StringFormat("Trailing modify failed: %s",sl_reason));
+               {
+                g_last_trailing_skip="";
+                string sl_reason="";
+                if(XAU_ModifyStop(g_trade,g_symbol,normalized_target_sl,sl_reason))
+                 {
+                  g_state.trade.stop_loss=normalized_target_sl;
+                  XAUJournal::Log("INFO",StringFormat("Trailing SL updated to %.5f",normalized_target_sl));
+                 }
+                else
+                  XAUJournal::Log("ERROR",StringFormat("Trailing modify failed: %s",sl_reason));
+               }
            }
         }
      }
@@ -200,53 +246,53 @@ void ProcessBar()
 
    if(daily_kill || g_state.trading_suspended_for_day)
      {
-      g_state.blocker_reason=StringFormat("Daily kill active (dd=%.2f%%)",dd_pct);
+      SetBlocker(StringFormat("Daily kill active (dd=%.2f%%)",dd_pct),"WARN");
       return;
      }
 
    if(InpUseRolloverBlock && XAU_IsWithinRolloverWindow(now,InpRolloverStartHour,InpRolloverStartMinute,InpRolloverEndHour,InpRolloverEndMinute))
      {
-      g_state.blocker_reason="Rollover block active";
+      SetBlocker("Rollover block active","INFO");
       return;
      }
 
    if(XAU_IsCooldownActive(g_symbol,InpSignalTF,g_state.last_exit_bar_time,InpCooldownBarsAfterExit))
      {
-      g_state.blocker_reason="Cooldown active";
+      SetBlocker("Cooldown active","INFO");
       return;
      }
 
    double spread=0.0;
    if(!XAU_IsSpreadAcceptable(g_symbol,atr1,InpMaxSpreadATRFrac,spread))
      {
-      g_state.blocker_reason=StringFormat("Spread too high %.5f",spread);
+      SetBlocker(StringFormat("Spread too high %.5f",spread),"INFO");
       return;
      }
 
    XAUSignalDecision sig=XAU_EvaluateBreakoutSignal(g_symbol,InpSignalTF,g_state.regime,InpBreakoutLookback,atr1,InpBreakoutBufferATRFrac);
    if(sig.signal==XAU_SIGNAL_NONE)
      {
-      g_state.blocker_reason="No breakout signal";
+      SetBlocker("No breakout signal","INFO");
       return;
      }
 
    if((sig.signal==XAU_SIGNAL_LONG && !InpEnableLongs) || (sig.signal==XAU_SIGNAL_SHORT && !InpEnableShorts))
      {
-      g_state.blocker_reason="Direction disabled by input";
+      SetBlocker("Direction disabled by input","INFO");
       return;
      }
 
    const datetime signal_bar_time=iTime(g_symbol,InpSignalTF,1);
    if(g_state.last_signal_bar_time==signal_bar_time)
      {
-      g_state.blocker_reason="Signal already traded this bar";
+      SetBlocker("Signal already traded this bar","INFO");
       return;
      }
 
    MqlTick tick;
    if(!SymbolInfoTick(g_symbol,tick))
      {
-      g_state.blocker_reason="No live tick";
+      SetBlocker("No live tick","WARN");
       return;
      }
 
@@ -257,8 +303,7 @@ void ProcessBar()
    string stop_reason="";
    if(!XAU_CheckStopDistance(g_symbol,order_type,entry_price,stop_price,stop_reason))
      {
-      g_state.blocker_reason=stop_reason;
-      XAUJournal::Log("WARN",stop_reason);
+      SetBlocker(stop_reason,"WARN");
       return;
      }
 
@@ -268,16 +313,14 @@ void ProcessBar()
    const double volume=XAU_ComputeRiskVolume(g_symbol,order_type,entry_price,stop_price,InpRiskPct,vol_reason,risk_per_lot,risk_target);
    if(volume<=0.0)
      {
-      g_state.blocker_reason=vol_reason;
-      XAUJournal::Log("WARN",StringFormat("Volume blocked: %s",vol_reason));
+      SetBlocker(StringFormat("Volume blocked: %s",vol_reason),"WARN");
       return;
      }
 
    string check_reason="";
    if(!XAU_PreflightOrderCheck(g_symbol,InpMagic,order_type,volume,entry_price,stop_price,InpSlippagePoints,check_reason))
      {
-      g_state.blocker_reason=check_reason;
-      XAUJournal::Log("WARN",check_reason);
+      SetBlocker(check_reason,"WARN");
       return;
      }
 
@@ -289,7 +332,7 @@ void ProcessBar()
    if(!XAU_OpenPosition(g_trade,g_symbol,order_type,volume,stop_price,"XAUTrend",open_reason))
      {
       XAUJournal::Log("ERROR",open_reason);
-      g_state.blocker_reason=open_reason;
+      SetBlocker(open_reason,"ERROR");
       return;
      }
 
@@ -299,6 +342,7 @@ void ProcessBar()
 
    g_state.last_signal_bar_time=signal_bar_time;
    g_state.blocker_reason="";
+   g_last_logged_blocker="";
   }
 
 void OnTick()

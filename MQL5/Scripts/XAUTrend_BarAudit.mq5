@@ -32,24 +32,31 @@ void OnStart()
      }
 
    Print("==== XAUTrend Bar Audit ====");
-   Print("time;close1;regime;breakout_high;breakout_low;atr;signal");
+   Print("time;close;regime;breakout_high;breakout_low;atr;signal");
 
    for(int shift=1;shift<=InpRows;shift++)
      {
-      const datetime t=iTime(symbol,InpSignalTF,shift);
-      if(t<=0)
+      const datetime signal_time=iTime(symbol,InpSignalTF,shift);
+      if(signal_time<=0)
          break;
+
+      const datetime decision_time=(shift>1 ? iTime(symbol,InpSignalTF,shift-1) : iTime(symbol,InpSignalTF,0));
+      int regime_shift=iBarShift(symbol,InpRegimeTF,decision_time,false);
+      if(regime_shift>=0)
+         regime_shift+=1; // completed H4 bar as of decision time
+      if(regime_shift<1)
+         continue;
 
       double atr=0.0;
       if(!XAU_GetATR(indicators,shift,atr))
          continue;
 
       string reason="";
-      ENUM_XAU_REGIME regime=XAU_ComputeRegime(symbol,InpRegimeTF,indicators,reason);
-      XAUSignalDecision s=XAU_EvaluateBreakoutSignal(symbol,InpSignalTF,regime,InpBreakoutLookback,atr,InpBreakoutBufferATRFrac);
+      const ENUM_XAU_REGIME regime=XAU_ComputeRegimeAtShift(symbol,InpRegimeTF,indicators,regime_shift,reason);
+      const XAUSignalDecision s=XAU_EvaluateBreakoutSignalAtShift(symbol,InpSignalTF,regime,shift,InpBreakoutLookback,atr,InpBreakoutBufferATRFrac);
 
       PrintFormat("%s;%.5f;%s;%.5f;%.5f;%.5f;%s",
-                  TimeToString(t,TIME_DATE|TIME_MINUTES),
+                  TimeToString(signal_time,TIME_DATE|TIME_MINUTES),
                   iClose(symbol,InpSignalTF,shift),
                   XAU_RegimeToString(regime),
                   s.breakout_high,
