@@ -8,7 +8,7 @@
 #include "../Include/XAUTrend/BreakoutSignal.mqh"
 #include "../Include/XAUTrend/Diagnostics.mqh"
 
-input string          InpSymbol = _Symbol;
+input string InpSymbol = "XAUUSD";
 input ENUM_TIMEFRAMES InpSignalTF = PERIOD_H1;
 input ENUM_TIMEFRAMES InpRegimeTF = PERIOD_H4;
 input int             InpRows = 50;

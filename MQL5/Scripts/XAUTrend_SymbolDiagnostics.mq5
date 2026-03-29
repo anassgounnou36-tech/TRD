@@ -1,7 +1,7 @@
 #property strict
 #property script_show_inputs
 
-input string InpSymbol = _Symbol;
+input string InpSymbol = "XAUUSD";
 
 void OnStart()
   {

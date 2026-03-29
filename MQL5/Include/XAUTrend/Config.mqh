@@ -1,7 +1,7 @@
 #ifndef __CONFIG_MQH__
 #define __CONFIG_MQH__
 
-input string InpSymbol = _Symbol;
+input string InpSymbol = "XAUUSD";
 input ulong  InpMagic = 26032026;
 input bool   InpEnableLongs = true;
 input bool   InpEnableShorts = true;
