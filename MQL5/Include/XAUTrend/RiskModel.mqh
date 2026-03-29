@@ -3,6 +3,8 @@
 #include "Types.mqh"
 #include "BarUtils.mqh"
 
+const double XAU_VOLUME_STEP_TOLERANCE=1e-9;
+
 void XAU_ResetDayIfNeeded(XAURuntimeState &state,const datetime now)
   {
    const datetime day_start=XAU_BrokerDayStart(now);
@@ -67,7 +69,7 @@ double XAU_NormalizeVolumeDown(const string symbol,const double raw)
       return(0.0);
 
    const double capped=MathMin(raw,vmax);
-   const double steps=MathFloor((capped-vmin)/step+1e-9);
+   const double steps=MathFloor((capped-vmin)/step+XAU_VOLUME_STEP_TOLERANCE);
    double volume=vmin+steps*step;
    volume=MathMax(vmin,MathMin(vmax,volume));
 

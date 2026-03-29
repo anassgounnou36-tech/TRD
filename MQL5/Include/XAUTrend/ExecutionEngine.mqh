@@ -2,6 +2,8 @@
 
 #include <Trade/Trade.mqh>
 
+const double XAU_PRICE_CHANGE_EPS_POINTS=0.5;
+
 bool XAU_ResolveFillingType(const string symbol,ENUM_ORDER_TYPE_FILLING &filling)
   {
    long fill_flags=0;
@@ -84,7 +86,7 @@ bool XAU_IsStopModificationAllowed(const string symbol,
       return(false);
      }
 
-   if(MathAbs(normalized_sl-normalized_current)<(0.5*point))
+   if(MathAbs(normalized_sl-normalized_current)<(XAU_PRICE_CHANGE_EPS_POINTS*point))
      {
       reason="Proposed SL unchanged after normalization";
       return(false);
