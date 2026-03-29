@@ -1,7 +1,7 @@
 # Parameter Reference
 
 ## General
-- `InpSymbol` (default `_Symbol`): trade symbol
+- `InpSymbol` (default `"XAUUSD"`): trade symbol
 - `InpMagic` (26032026): EA magic number
 - `InpEnableLongs` (true): allow long entries
 - `InpEnableShorts` (true): allow short entries

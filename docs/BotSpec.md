@@ -1,7 +1,7 @@
 # XAU Trend Breakout EA Spec
 
 ## Strategy summary
-A single-strategy, pure MQL5 trend-following EA for gold symbols (default chart symbol via `_Symbol`).
+A single-strategy, pure MQL5 trend-following EA for gold symbols (default symbol `"XAUUSD"`).
 
 - Regime filter: H4 close vs EMA(200) with EMA slope confirmation
 - Trigger: H1 breakout on completed bars only
@@ -29,7 +29,7 @@ A single-strategy, pure MQL5 trend-following EA for gold symbols (default chart 
 
 ## Assumptions
 - Intended first deployment: XAUUSD H1 chart
-- Broker symbol suffixes supported by using configurable symbol defaulting to chart symbol
+- Broker symbol suffixes supported by using configurable symbol input
 
 ## Known limitations
 - Chart panel is informational only and not required for strategy logic
