@@ -13,7 +13,7 @@ namespace XAUJournal
       if(!g_enabled)
          return(true);
 
-      g_handle=FileOpen(g_file_name,FILE_COMMON|FILE_WRITE|FILE_READ|FILE_CSV|FILE_SHARE_WRITE|FILE_ANSI,';');
+      g_handle=FileOpen(g_file_name,FILE_COMMON|FILE_WRITE|FILE_CSV|FILE_SHARE_WRITE|FILE_ANSI,';');
       if(g_handle==INVALID_HANDLE)
         {
          PrintFormat("[XAUTrend][ERROR] File log open failed: %s",g_file_name);

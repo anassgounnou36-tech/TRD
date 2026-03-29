@@ -21,6 +21,7 @@ CTrade            g_trade;
 XAURuntimeState   g_state;
 XAUIndicatorState g_indicators;
 string            g_symbol;
+const int         XAU_MIN_HISTORY_BUFFER=20;
 
 void ResetRuntimeState()
   {
@@ -46,7 +47,7 @@ int OnInit()
 
    XAUJournal::Log("INFO",StringFormat("Initializing on chart=%s trade_symbol=%s",_Symbol,g_symbol));
 
-   if(Bars(g_symbol,InpSignalTF)<(InpBreakoutLookback+20) || Bars(g_symbol,InpRegimeTF)<(InpRegimeEMAPeriod+20))
+   if(Bars(g_symbol,InpSignalTF)<(InpBreakoutLookback+XAU_MIN_HISTORY_BUFFER) || Bars(g_symbol,InpRegimeTF)<(InpRegimeEMAPeriod+XAU_MIN_HISTORY_BUFFER))
      {
       XAUJournal::Log("ERROR","Insufficient history for strategy startup");
       return(INIT_FAILED);
