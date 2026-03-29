@@ -1,0 +1,5 @@
+InpRiskPct=0.25
+InpInitialStopATR=3.0
+InpTrailATR=3.5
+InpBreakoutLookback=60
+InpMaxSpreadATRFrac=0.06
