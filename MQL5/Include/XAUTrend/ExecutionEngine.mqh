@@ -5,31 +5,70 @@
 
 const double XAU_PRICE_CHANGE_EPS_POINTS=0.5;
 
-bool XAU_ResolveFillingType(const string symbol,ENUM_ORDER_TYPE_FILLING &filling)
+string XAU_TradeRetcodeToString(const uint retcode)
   {
-   long fill_flags=0;
+   switch(retcode)
+     {
+      case TRADE_RETCODE_DONE:             return("TRADE_RETCODE_DONE");
+      case TRADE_RETCODE_PLACED:           return("TRADE_RETCODE_PLACED");
+      case TRADE_RETCODE_REQUOTE:          return("TRADE_RETCODE_REQUOTE");
+      case TRADE_RETCODE_REJECT:           return("TRADE_RETCODE_REJECT");
+      case TRADE_RETCODE_CANCEL:           return("TRADE_RETCODE_CANCEL");
+      case TRADE_RETCODE_INVALID:          return("TRADE_RETCODE_INVALID");
+      case TRADE_RETCODE_INVALID_VOLUME:   return("TRADE_RETCODE_INVALID_VOLUME");
+      case TRADE_RETCODE_INVALID_PRICE:    return("TRADE_RETCODE_INVALID_PRICE");
+      case TRADE_RETCODE_INVALID_STOPS:    return("TRADE_RETCODE_INVALID_STOPS");
+      case TRADE_RETCODE_TRADE_DISABLED:   return("TRADE_RETCODE_TRADE_DISABLED");
+      case TRADE_RETCODE_MARKET_CLOSED:    return("TRADE_RETCODE_MARKET_CLOSED");
+      case TRADE_RETCODE_NO_MONEY:         return("TRADE_RETCODE_NO_MONEY");
+      case TRADE_RETCODE_PRICE_CHANGED:    return("TRADE_RETCODE_PRICE_CHANGED");
+      case TRADE_RETCODE_PRICE_OFF:        return("TRADE_RETCODE_PRICE_OFF");
+      case TRADE_RETCODE_INVALID_FILL:     return("TRADE_RETCODE_INVALID_FILL");
+      default:                             return("TRADE_RETCODE_UNKNOWN");
+     }
+  }
+
+bool XAU_IsReturnFillingAllowed(const long execution_mode)
+  {
+   return(execution_mode!=SYMBOL_TRADE_EXECUTION_MARKET);
+  }
+
+bool XAU_ResolveFillingType(const string symbol,ENUM_ORDER_TYPE_FILLING &filling,long &fill_flags,long &execution_mode)
+  {
+   fill_flags=0;
+   execution_mode=0;
    if(!SymbolInfoInteger(symbol,SYMBOL_FILLING_MODE,fill_flags))
       return(false);
+   if(!SymbolInfoInteger(symbol,SYMBOL_TRADE_EXEMODE,execution_mode))
+      return(false);
 
-   if((fill_flags & SYMBOL_FILLING_FOK)==SYMBOL_FILLING_FOK)
-     {
-      filling=ORDER_FILLING_FOK;
-      return(true);
-     }
    if((fill_flags & SYMBOL_FILLING_IOC)==SYMBOL_FILLING_IOC)
+      {
+       filling=ORDER_FILLING_IOC;
+       return(true);
+      }
+   if((fill_flags & SYMBOL_FILLING_FOK)==SYMBOL_FILLING_FOK)
+      {
+       filling=ORDER_FILLING_FOK;
+       return(true);
+      }
+   if(XAU_IsReturnFillingAllowed(execution_mode))
      {
-      filling=ORDER_FILLING_IOC;
+      filling=ORDER_FILLING_RETURN;
       return(true);
      }
-   filling=ORDER_FILLING_RETURN;
-   return(true);
+   return(false);
   }
 
 void XAU_ConfigureTrade(CTrade &trade,const ulong magic,const int slippage_points,const string symbol)
   {
    trade.SetExpertMagicNumber(magic);
    trade.SetDeviationInPoints(slippage_points);
-   trade.SetTypeFillingBySymbol(symbol);
+   ENUM_ORDER_TYPE_FILLING filling=ORDER_FILLING_IOC;
+   long fill_flags=0;
+   long execution_mode=0;
+   if(XAU_ResolveFillingType(symbol,filling,fill_flags,execution_mode))
+      trade.SetTypeFilling(filling);
    trade.SetAsyncMode(false);
   }
 
@@ -154,9 +193,27 @@ bool XAU_PreflightOrderCheck(const string symbol,
                              const double price,
                              const double stop,
                              const int deviation_points,
+                             ENUM_ORDER_TYPE_FILLING &resolved_filling,
                              string &reason)
   {
    reason="";
+   resolved_filling=ORDER_FILLING_IOC;
+
+   MqlTick tick;
+   if(!SymbolInfoTick(symbol,tick))
+     {
+      reason="Execution preflight blocked: no tick available for OrderCheck";
+      return(false);
+     }
+
+   const int digits=(int)SymbolInfoInteger(symbol,SYMBOL_DIGITS);
+   const double point=SymbolInfoDouble(symbol,SYMBOL_POINT);
+   const long stops_level=SymbolInfoInteger(symbol,SYMBOL_TRADE_STOPS_LEVEL);
+   const long freeze_level=SymbolInfoInteger(symbol,SYMBOL_TRADE_FREEZE_LEVEL);
+   const long trade_mode=SymbolInfoInteger(symbol,SYMBOL_TRADE_MODE);
+   const long execution_mode=SymbolInfoInteger(symbol,SYMBOL_TRADE_EXEMODE);
+   long fill_flags=0;
+   SymbolInfoInteger(symbol,SYMBOL_FILLING_MODE,fill_flags);
 
    MqlTradeRequest req;
    MqlTradeCheckResult check;
@@ -168,36 +225,40 @@ bool XAU_PreflightOrderCheck(const string symbol,
    req.magic=magic;
    req.volume=volume;
    req.type=order_type;
-   req.price=price;
-   req.sl=stop;
+   req.price=NormalizeDouble(price,digits);
+   req.sl=NormalizeDouble(stop,digits);
    req.tp=0.0;
    req.deviation=deviation_points;
    req.type_time=ORDER_TIME_GTC;
+   req.comment="XAUTrend";
 
-   ENUM_ORDER_TYPE_FILLING filling;
-   if(!XAU_ResolveFillingType(symbol,filling))
-     {
-      reason="OrderCheck blocked: unable to resolve symbol filling mode";
+   ENUM_ORDER_TYPE_FILLING filling=ORDER_FILLING_IOC;
+   if(!XAU_ResolveFillingType(symbol,filling,fill_flags,execution_mode))
+      {
+      reason=StringFormat("Execution preflight blocked: unable to resolve symbol filling mode (sym_fill_flags=%d sym_exec_mode=%d)",
+                          (int)fill_flags,(int)execution_mode);
       return(false);
-     }
+      }
+   resolved_filling=filling;
    req.type_filling=filling;
 
+   ResetLastError();
    if(!OrderCheck(req,check))
-     {
-      reason=StringFormat("OrderCheck call failed (%d)",GetLastError());
+      {
+      const int last_error=GetLastError();
+      reason=StringFormat("Execution preflight blocked: OrderCheck call failed last_error=%d action=%d type=%d vol=%.2f price=%.5f sl=%.5f tp=%.5f dev=%d fill=%d time=%d sym_fill_flags=%d sym_trade_mode=%d sym_exec_mode=%d stops=%d freeze=%d bid=%.5f ask=%.5f point=%.8f digits=%d",
+                          last_error,(int)req.action,(int)req.type,req.volume,req.price,req.sl,req.tp,(int)req.deviation,(int)req.type_filling,(int)req.type_time,
+                          (int)fill_flags,(int)trade_mode,(int)execution_mode,(int)stops_level,(int)freeze_level,tick.bid,tick.ask,point,digits);
       return(false);
-     }
+      }
 
    if(check.retcode!=TRADE_RETCODE_DONE && check.retcode!=TRADE_RETCODE_PLACED)
-     {
-      long fill_flags=0;
-      long trade_mode=0;
-      SymbolInfoInteger(symbol,SYMBOL_FILLING_MODE,fill_flags);
-      SymbolInfoInteger(symbol,SYMBOL_TRADE_MODE,trade_mode);
-      reason=StringFormat("OrderCheck blocked: ret=%d comment=%s req_fill=%d sym_fill_flags=%d sym_trade_mode=%d",
-                          check.retcode,check.comment,req.type_filling,(int)fill_flags,(int)trade_mode);
+      {
+      reason=StringFormat("Execution preflight blocked: OrderCheck retcode=%d(%s) comment=%s action=%d type=%d vol=%.2f price=%.5f sl=%.5f tp=%.5f dev=%d fill=%d time=%d sym_fill_flags=%d sym_trade_mode=%d sym_exec_mode=%d stops=%d freeze=%d bid=%.5f ask=%.5f point=%.8f digits=%d",
+                          check.retcode,XAU_TradeRetcodeToString((uint)check.retcode),check.comment,(int)req.action,(int)req.type,req.volume,req.price,req.sl,req.tp,(int)req.deviation,(int)req.type_filling,(int)req.type_time,
+                          (int)fill_flags,(int)trade_mode,(int)execution_mode,(int)stops_level,(int)freeze_level,tick.bid,tick.ask,point,digits);
       return(false);
-     }
+      }
 
    return(true);
   }
@@ -207,11 +268,13 @@ bool XAU_OpenPosition(CTrade &trade,
                       const ENUM_ORDER_TYPE order_type,
                       const double volume,
                       const double stop,
+                      const ENUM_ORDER_TYPE_FILLING filling,
                       const string comment,
                       string &reason)
   {
    reason="";
    bool ok=false;
+   trade.SetTypeFilling(filling);
 
    if(order_type==ORDER_TYPE_BUY)
       ok=trade.Buy(volume,symbol,0.0,stop,0.0,comment);

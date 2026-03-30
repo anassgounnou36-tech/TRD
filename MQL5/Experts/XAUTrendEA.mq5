@@ -317,20 +317,21 @@ void ProcessBar()
       return;
      }
 
+   ENUM_ORDER_TYPE_FILLING filling=ORDER_FILLING_IOC;
    string check_reason="";
-   if(!XAU_PreflightOrderCheck(g_symbol,InpMagic,order_type,volume,entry_price,stop_price,InpSlippagePoints,check_reason))
-     {
+   if(!XAU_PreflightOrderCheck(g_symbol,InpMagic,order_type,volume,entry_price,stop_price,InpSlippagePoints,filling,check_reason))
+      {
       SetBlocker(check_reason,"WARN");
       return;
-     }
+      }
 
    XAUJournal_Log("INFO",StringFormat("Entry setup signal=%s regime=%s close1=%.5f breakoutH=%.5f breakoutL=%.5f atr=%.5f stop=%.5f vol=%.2f riskCash=%.2f",
                                          XAU_SignalToString(sig.signal),XAU_RegimeToString(g_state.regime),
                                          sig.signal_close,sig.breakout_high,sig.breakout_low,atr1,stop_price,volume,risk_target));
 
    string open_reason="";
-   if(!XAU_OpenPosition(g_trade,g_symbol,order_type,volume,stop_price,"XAUTrend",open_reason))
-     {
+   if(!XAU_OpenPosition(g_trade,g_symbol,order_type,volume,stop_price,filling,"XAUTrend",open_reason))
+      {
       XAUJournal_Log("ERROR",open_reason);
       SetBlocker(open_reason,"ERROR");
       return;
