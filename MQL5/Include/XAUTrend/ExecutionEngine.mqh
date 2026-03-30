@@ -211,7 +211,8 @@ bool XAU_PreflightOrderCheck(const string symbol,
    const long stops_level=SymbolInfoInteger(symbol,SYMBOL_TRADE_STOPS_LEVEL);
    const long freeze_level=SymbolInfoInteger(symbol,SYMBOL_TRADE_FREEZE_LEVEL);
    const long trade_mode=SymbolInfoInteger(symbol,SYMBOL_TRADE_MODE);
-   const long execution_mode=SymbolInfoInteger(symbol,SYMBOL_TRADE_EXEMODE);
+   long execution_mode=0;
+   SymbolInfoInteger(symbol,SYMBOL_TRADE_EXEMODE,execution_mode);
    long fill_flags=0;
    SymbolInfoInteger(symbol,SYMBOL_FILLING_MODE,fill_flags);
 
