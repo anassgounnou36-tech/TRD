@@ -28,6 +28,38 @@ string XAU_TradeRetcodeToString(const uint retcode)
      }
   }
 
+bool XAU_IsBlockingPreflightRetcode(const uint retcode)
+  {
+   switch(retcode)
+     {
+      case TRADE_RETCODE_REJECT:
+      case TRADE_RETCODE_CANCEL:
+      case TRADE_RETCODE_INVALID:
+      case TRADE_RETCODE_INVALID_VOLUME:
+      case TRADE_RETCODE_INVALID_PRICE:
+      case TRADE_RETCODE_INVALID_STOPS:
+      case TRADE_RETCODE_TRADE_DISABLED:
+      case TRADE_RETCODE_MARKET_CLOSED:
+      case TRADE_RETCODE_NO_MONEY:
+      case TRADE_RETCODE_INVALID_FILL:
+         return(true);
+      default:
+         return(false);
+     }
+  }
+
+bool XAU_IsBlankText(const string value)
+  {
+   const int len=StringLen(value);
+   for(int i=0; i<len; ++i)
+     {
+      const ushort ch=(ushort)StringGetCharacter(value,i);
+      if(ch!=' ' && ch!='\t' && ch!='\r' && ch!='\n')
+         return(false);
+     }
+   return(true);
+  }
+
 bool XAU_IsReturnFillingAllowed(const long execution_mode)
   {
    return(execution_mode!=SYMBOL_TRADE_EXECUTION_MARKET);
@@ -226,7 +258,7 @@ bool XAU_PreflightOrderCheck(const string symbol,
    req.magic=magic;
    req.volume=volume;
    req.type=order_type;
-   req.price=NormalizeDouble(price,digits);
+   req.price=0.0;
    req.sl=NormalizeDouble(stop,digits);
    req.tp=0.0;
    req.deviation=deviation_points;
@@ -253,14 +285,28 @@ bool XAU_PreflightOrderCheck(const string symbol,
       return(false);
       }
 
-   if(check.retcode!=TRADE_RETCODE_DONE && check.retcode!=TRADE_RETCODE_PLACED)
+   if(check.retcode==TRADE_RETCODE_DONE || check.retcode==TRADE_RETCODE_PLACED)
+      return(true);
+
+   if(XAU_IsBlockingPreflightRetcode((uint)check.retcode))
       {
-      reason=StringFormat("Execution preflight blocked: OrderCheck retcode=%d(%s) comment=%s action=%d type=%d vol=%.2f price=%.5f sl=%.5f tp=%.5f dev=%d fill=%d time=%d sym_fill_flags=%d sym_trade_mode=%d sym_exec_mode=%d stops=%d freeze=%d bid=%.5f ask=%.5f point=%.8f digits=%d",
-                          check.retcode,XAU_TradeRetcodeToString((uint)check.retcode),check.comment,(int)req.action,(int)req.type,req.volume,req.price,req.sl,req.tp,(int)req.deviation,(int)req.type_filling,(int)req.type_time,
-                          (int)fill_flags,(int)trade_mode,(int)execution_mode,(int)stops_level,(int)freeze_level,tick.bid,tick.ask,point,digits);
-      return(false);
+       reason=StringFormat("Execution preflight blocked: explicit broker/server rejection retcode=%d(%s) comment=%s action=%d type=%d vol=%.2f price=%.5f target_price=%.5f sl=%.5f tp=%.5f dev=%d fill=%d time=%d sym_fill_flags=%d sym_trade_mode=%d sym_exec_mode=%d stops=%d freeze=%d bid=%.5f ask=%.5f point=%.8f digits=%d",
+                           check.retcode,XAU_TradeRetcodeToString((uint)check.retcode),check.comment,(int)req.action,(int)req.type,req.volume,req.price,NormalizeDouble(price,digits),req.sl,req.tp,(int)req.deviation,(int)req.type_filling,(int)req.type_time,
+                           (int)fill_flags,(int)trade_mode,(int)execution_mode,(int)stops_level,(int)freeze_level,tick.bid,tick.ask,point,digits);
+       return(false);
       }
 
+   if(check.retcode==0 && XAU_IsBlankText(check.comment))
+      {
+       PrintFormat("Execution preflight warning: OrderCheck returned true but retcode/comment were inconclusive; proceeding to actual order send action=%d type=%d vol=%.2f price=%.5f target_price=%.5f sl=%.5f tp=%.5f dev=%d fill=%d time=%d sym_fill_flags=%d sym_trade_mode=%d sym_exec_mode=%d stops=%d freeze=%d bid=%.5f ask=%.5f point=%.8f digits=%d",
+                   (int)req.action,(int)req.type,req.volume,req.price,NormalizeDouble(price,digits),req.sl,req.tp,(int)req.deviation,(int)req.type_filling,(int)req.type_time,
+                   (int)fill_flags,(int)trade_mode,(int)execution_mode,(int)stops_level,(int)freeze_level,tick.bid,tick.ask,point,digits);
+       return(true);
+      }
+
+   PrintFormat("Execution preflight warning: OrderCheck returned non-blocking retcode=%d(%s) comment=%s; proceeding to actual order send action=%d type=%d vol=%.2f price=%.5f target_price=%.5f sl=%.5f tp=%.5f dev=%d fill=%d time=%d sym_fill_flags=%d sym_trade_mode=%d sym_exec_mode=%d stops=%d freeze=%d bid=%.5f ask=%.5f point=%.8f digits=%d",
+               check.retcode,XAU_TradeRetcodeToString((uint)check.retcode),check.comment,(int)req.action,(int)req.type,req.volume,req.price,NormalizeDouble(price,digits),req.sl,req.tp,(int)req.deviation,(int)req.type_filling,(int)req.type_time,
+               (int)fill_flags,(int)trade_mode,(int)execution_mode,(int)stops_level,(int)freeze_level,tick.bid,tick.ask,point,digits);
    return(true);
   }
 
