@@ -13,19 +13,25 @@ input ENUM_TIMEFRAMES InpSignalTF = PERIOD_H1;
 input ENUM_TIMEFRAMES InpRegimeTF = PERIOD_H4;
 
 input int    InpRegimeEMAPeriod = 200;
-input int    InpBreakoutLookback = 55;
 input int    InpATRPeriod = 14;
 input double InpBreakoutBufferATRFrac = 0.10;
 
 input double InpInitialStopATR = 2.5;
 input int    InpSwingStopLookback = 10;
 input double InpStopBufferATRFrac = 0.20;
-input double InpTrailATR = 3.0;
+input double InpTrailATRFrac = 3.0;
 input bool   InpExitOnRegimeFlip = true;
 
 input double InpRiskPct = 0.50;
+input bool   InpAllowMinVolumeOverride = false;
 input double InpMaxDailyLossPct = 2.0;
+input bool   InpDailyLossUseEquity = true;
 input bool   InpForceCloseOnDailyKill = true;
+
+input int    InpSessionStartHour = 8;
+input int    InpSessionStartMinute = 0;
+input int    InpOpeningRangeMinutes = 60;
+input int    InpMaxSessionTrades = 1;
 
 input double InpMaxSpreadATRFrac = 0.08;
 input int    InpCooldownBarsAfterExit = 2;

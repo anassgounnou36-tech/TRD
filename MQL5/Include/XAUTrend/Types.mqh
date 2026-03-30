@@ -33,13 +33,21 @@ struct XAURuntimeState
    datetime          last_h4_bar_time;
    datetime          last_signal_bar_time;
    datetime          last_exit_bar_time;
-   datetime          day_start_time;
-   double            day_start_equity;
-   bool              trading_suspended_for_day;
-   bool              integrity_violation;
-   ENUM_XAU_REGIME   regime;
-   string            blocker_reason;
-   XAUTradeState     trade;
+    datetime          day_start_time;
+    datetime          session_start_time;
+    double            day_start_equity;
+    double            day_start_balance;
+    bool              trading_suspended_for_day;
+    bool              integrity_violation;
+    ENUM_XAU_REGIME   regime;
+    string            blocker_reason;
+    string            daily_blocker_reason;
+    int               session_trades_used;
+    bool              or_built;
+    double            or_high;
+    double            or_low;
+    string            setup_candidate;
+    XAUTradeState     trade;
   };
 
 struct XAUIndicatorState
@@ -50,11 +58,19 @@ struct XAUIndicatorState
 
 struct XAUSignalDecision
   {
-   ENUM_XAU_SIGNAL signal;
-   double          breakout_high;
-   double          breakout_low;
-   double          signal_close;
-   double          breakout_buffer;
+    ENUM_XAU_SIGNAL signal;
+    double          breakout_high;
+    double          breakout_low;
+    double          signal_close;
+    double          breakout_buffer;
+    bool            or_built;
+    datetime        session_start;
+    datetime        or_end_time;
+    bool            breakout_valid;
+    bool            reclaim_valid;
+    bool            bias_valid;
+    string          setup_type;
+    string          blocker_reason;
   };
 
 struct XAUPositionSnapshot

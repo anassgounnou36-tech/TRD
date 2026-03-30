@@ -15,7 +15,9 @@
 
 ## Trend / Signal
 - `InpRegimeEMAPeriod` (200)
-- `InpBreakoutLookback` (55)
+- `InpSessionStartHour` (8)
+- `InpSessionStartMinute` (0)
+- `InpOpeningRangeMinutes` (60)
 - `InpATRPeriod` (14)
 - `InpBreakoutBufferATRFrac` (0.10)
 
@@ -23,13 +25,16 @@
 - `InpInitialStopATR` (2.5)
 - `InpSwingStopLookback` (10)
 - `InpStopBufferATRFrac` (0.20)
-- `InpTrailATR` (3.0)
+- `InpTrailATRFrac` (3.0)
 - `InpExitOnRegimeFlip` (true)
 
 ## Risk
 - `InpRiskPct` (0.50)
 - `InpMaxDailyLossPct` (2.0)
+- `InpAllowMinVolumeOverride` (false)
+- `InpDailyLossUseEquity` (true)
 - `InpForceCloseOnDailyKill` (true)
+- `InpMaxSessionTrades` (1)
 
 ## Filters
 - `InpMaxSpreadATRFrac` (0.08)

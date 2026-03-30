@@ -23,6 +23,33 @@ bool XAU_IsNewBar(const string symbol,const ENUM_TIMEFRAMES tf,datetime &last_ti
    return(false);
   }
 
+datetime XAU_SessionStartForTime(const datetime when,const int start_hour,const int start_minute)
+  {
+   MqlDateTime dt;
+   TimeToStruct(when,dt);
+   dt.hour=start_hour;
+   dt.min=start_minute;
+   dt.sec=0;
+   datetime session_start=StructToTime(dt);
+   if(when<session_start)
+      session_start-=86400;
+   return(session_start);
+  }
+
+datetime XAU_OpeningRangeEndTime(const datetime session_start,const int opening_range_minutes)
+  {
+   if(opening_range_minutes<=0)
+      return(session_start);
+   return(session_start+(opening_range_minutes*60));
+  }
+
+bool XAU_IsBarInOpeningRange(const datetime bar_open,
+                             const datetime session_start,
+                             const datetime or_end_time)
+  {
+   return(bar_open>=session_start && bar_open<or_end_time);
+  }
+
 datetime XAU_BrokerDayStart(const datetime when)
   {
    MqlDateTime dt;

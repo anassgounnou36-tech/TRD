@@ -1,5 +1,5 @@
 InpRiskPct=0.75
 InpInitialStopATR=2.2
-InpTrailATR=2.8
-InpBreakoutLookback=50
+InpTrailATRFrac=2.8
+InpOpeningRangeMinutes=50
 InpMaxSpreadATRFrac=0.10

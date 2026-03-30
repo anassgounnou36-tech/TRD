@@ -13,21 +13,23 @@ void XAU_ResetDayIfNeeded(XAURuntimeState &state,const datetime now)
      {
       state.day_start_time=day_start;
       state.day_start_equity=AccountInfoDouble(ACCOUNT_EQUITY);
+      state.day_start_balance=AccountInfoDouble(ACCOUNT_BALANCE);
       state.trading_suspended_for_day=false;
      }
   }
 
-double XAU_DailyDrawdownPct(const XAURuntimeState &state)
+double XAU_DailyDrawdownPct(const XAURuntimeState &state,const bool use_equity)
   {
-   if(state.day_start_equity<=0.0)
+   const double day_start=(use_equity ? state.day_start_equity : state.day_start_balance);
+   if(day_start<=0.0)
       return(0.0);
-   const double equity=AccountInfoDouble(ACCOUNT_EQUITY);
-   return((state.day_start_equity-equity)/state.day_start_equity*100.0);
+   const double current=(use_equity ? AccountInfoDouble(ACCOUNT_EQUITY) : AccountInfoDouble(ACCOUNT_BALANCE));
+   return((day_start-current)/day_start*100.0);
   }
 
-bool XAU_IsDailyKillTriggered(XAURuntimeState &state,const double max_daily_loss_pct,double &dd_pct)
+bool XAU_IsDailyKillTriggered(XAURuntimeState &state,const double max_daily_loss_pct,const bool use_equity,double &dd_pct)
   {
-   dd_pct=XAU_DailyDrawdownPct(state);
+   dd_pct=XAU_DailyDrawdownPct(state,use_equity);
    if(dd_pct>=max_daily_loss_pct)
      {
       state.trading_suspended_for_day=true;
@@ -90,6 +92,7 @@ double XAU_ComputeRiskVolume(const string symbol,
                              const double entry_price,
                              const double stop_price,
                              const double risk_pct,
+                             const bool allow_min_override,
                              string &reason,
                              double &risk_per_lot_cash,
                              double &risk_cash_target)
@@ -119,8 +122,18 @@ double XAU_ComputeRiskVolume(const string symbol,
       return(0.0);
      }
 
-   risk_cash_target=equity*risk_pct/100.0;
+    risk_cash_target=equity*risk_pct/100.0;
    const double raw_volume=risk_cash_target/risk_per_lot_cash;
+   const double vmin=SymbolInfoDouble(symbol,SYMBOL_VOLUME_MIN);
+   if(vmin>0.0 && raw_volume<vmin)
+     {
+      if(!allow_min_override)
+        {
+         reason=StringFormat("Raw volume below symbol minimum (raw=%.6f min=%.6f)",raw_volume,vmin);
+         return(0.0);
+        }
+      reason=StringFormat("WARNING: min-volume override active (raw=%.6f min=%.6f)",raw_volume,vmin);
+     }
    const double volume=XAU_NormalizeVolumeDown(symbol,raw_volume);
 
    if(volume<=0.0)

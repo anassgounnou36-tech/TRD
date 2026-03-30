@@ -32,11 +32,19 @@ void ResetRuntimeState()
    g_state.last_signal_bar_time=0;
    g_state.last_exit_bar_time=0;
    g_state.day_start_time=0;
+   g_state.session_start_time=0;
    g_state.day_start_equity=0.0;
+   g_state.day_start_balance=0.0;
    g_state.trading_suspended_for_day=false;
    g_state.integrity_violation=false;
    g_state.regime=XAU_REGIME_NEUTRAL;
    g_state.blocker_reason="";
+   g_state.daily_blocker_reason="";
+   g_state.session_trades_used=0;
+   g_state.or_built=false;
+   g_state.or_high=0.0;
+   g_state.or_low=0.0;
+   g_state.setup_candidate="";
    XAU_ClearTradeState(g_state.trade);
   }
 
@@ -60,7 +68,7 @@ int OnInit()
 
    XAUJournal_Log("INFO",StringFormat("Initializing on chart=%s trade_symbol=%s",_Symbol,g_symbol));
 
-   if(Bars(g_symbol,InpSignalTF)<(InpBreakoutLookback+XAU_MIN_HISTORY_BUFFER) || Bars(g_symbol,InpRegimeTF)<(InpRegimeEMAPeriod+XAU_MIN_HISTORY_BUFFER))
+   if(Bars(g_symbol,InpSignalTF)<(InpOpeningRangeMinutes+XAU_MIN_HISTORY_BUFFER) || Bars(g_symbol,InpRegimeTF)<(InpRegimeEMAPeriod+XAU_MIN_HISTORY_BUFFER))
      {
       XAUJournal_Log("ERROR","Insufficient history for strategy startup");
       return(INIT_FAILED);
@@ -121,8 +129,19 @@ void OnTradeTransaction(const MqlTradeTransaction &trans,const MqlTradeRequest &
 void ProcessBar()
   {
    g_state.blocker_reason="";
+   g_state.daily_blocker_reason="";
+   g_state.setup_candidate="";
+   g_state.or_built=false;
+   g_state.or_high=0.0;
+   g_state.or_low=0.0;
    const datetime now=TimeTradeServer();
    XAU_ResetDayIfNeeded(g_state,now);
+   const datetime session_start=XAU_SessionStartForTime(now,InpSessionStartHour,InpSessionStartMinute);
+   if(g_state.session_start_time!=session_start)
+     {
+      g_state.session_start_time=session_start;
+      g_state.session_trades_used=0;
+     }
 
    string env_reason="";
    if(!XAU_IsTradeEnvironmentReady(g_symbol,env_reason))
@@ -142,7 +161,7 @@ void ProcessBar()
    g_state.regime=XAU_ComputeRegime(g_symbol,InpRegimeTF,g_indicators,regime_reason);
 
    double dd_pct=0.0;
-   const bool daily_kill=XAU_IsDailyKillTriggered(g_state,InpMaxDailyLossPct,dd_pct);
+   const bool daily_kill=XAU_IsDailyKillTriggered(g_state,InpMaxDailyLossPct,InpDailyLossUseEquity,dd_pct);
 
    XAUPositionSnapshot snap;
    XAU_FindOpenPosition(g_symbol,InpMagic,snap);
@@ -197,7 +216,7 @@ void ProcessBar()
       if(!exited_this_cycle)
         {
          XAU_UpdateExtremesFromClosedBar(g_symbol,InpSignalTF,g_state.trade);
-         const double trail_stop=XAU_ComputeTrailingStop(g_symbol,g_state.trade.direction,g_state.trade,atr1,InpTrailATR);
+         const double trail_stop=XAU_ComputeTrailingStop(g_symbol,g_state.trade.direction,g_state.trade,atr1,InpTrailATRFrac);
          double target_sl=g_state.trade.stop_loss;
 
          if(g_state.trade.direction==XAU_SIGNAL_LONG)
@@ -244,11 +263,12 @@ void ProcessBar()
    if(g_state.trade.has_position)
       return;
 
-   if(daily_kill || g_state.trading_suspended_for_day)
-     {
-      SetBlocker(StringFormat("Daily kill active (dd=%.2f%%)",dd_pct),"WARN");
-      return;
-     }
+    if(daily_kill || g_state.trading_suspended_for_day)
+      {
+       g_state.daily_blocker_reason=StringFormat("Daily kill active (dd=%.2f%%, basis=%s)",dd_pct,(InpDailyLossUseEquity?"equity":"balance"));
+       SetBlocker(g_state.daily_blocker_reason,"WARN");
+       return;
+      }
 
    if(InpUseRolloverBlock && XAU_IsWithinRolloverWindow(now,InpRolloverStartHour,InpRolloverStartMinute,InpRolloverEndHour,InpRolloverEndMinute))
      {
@@ -256,9 +276,15 @@ void ProcessBar()
       return;
      }
 
-   if(XAU_IsCooldownActive(g_symbol,InpSignalTF,g_state.last_exit_bar_time,InpCooldownBarsAfterExit))
+    if(XAU_IsCooldownActive(g_symbol,InpSignalTF,g_state.last_exit_bar_time,InpCooldownBarsAfterExit))
      {
       SetBlocker("Cooldown active","INFO");
+      return;
+      }
+
+   if(InpMaxSessionTrades>0 && g_state.session_trades_used>=InpMaxSessionTrades)
+     {
+      SetBlocker(StringFormat("Session trade cap reached (%d)",g_state.session_trades_used),"INFO");
       return;
      }
 
@@ -269,12 +295,16 @@ void ProcessBar()
       return;
      }
 
-   XAUSignalDecision sig=XAU_EvaluateBreakoutSignal(g_symbol,InpSignalTF,g_state.regime,InpBreakoutLookback,atr1,InpBreakoutBufferATRFrac);
+   XAUSignalDecision sig=XAU_EvaluateBreakoutSignal(g_symbol,InpSignalTF,g_state.regime,InpSessionStartHour,InpSessionStartMinute,InpOpeningRangeMinutes,atr1,InpBreakoutBufferATRFrac);
+   g_state.or_built=sig.or_built;
+   g_state.or_high=sig.breakout_high;
+   g_state.or_low=sig.breakout_low;
+   g_state.setup_candidate=sig.setup_type;
    if(sig.signal==XAU_SIGNAL_NONE)
-     {
-      SetBlocker("No breakout signal","INFO");
-      return;
-     }
+      {
+       SetBlocker((sig.blocker_reason==""?"No breakout signal":sig.blocker_reason),"INFO");
+       return;
+      }
 
    if((sig.signal==XAU_SIGNAL_LONG && !InpEnableLongs) || (sig.signal==XAU_SIGNAL_SHORT && !InpEnableShorts))
      {
@@ -310,7 +340,7 @@ void ProcessBar()
    double risk_per_lot=0.0;
    double risk_target=0.0;
    string vol_reason="";
-   const double volume=XAU_ComputeRiskVolume(g_symbol,order_type,entry_price,stop_price,InpRiskPct,vol_reason,risk_per_lot,risk_target);
+    const double volume=XAU_ComputeRiskVolume(g_symbol,order_type,entry_price,stop_price,InpRiskPct,InpAllowMinVolumeOverride,vol_reason,risk_per_lot,risk_target);
    if(volume<=0.0)
      {
       SetBlocker(StringFormat("Volume blocked: %s",vol_reason),"WARN");
@@ -338,12 +368,13 @@ void ProcessBar()
      }
 
    XAU_FindOpenPosition(g_symbol,InpMagic,snap);
-   if(snap.found)
-      XAU_RebuildTradeStateFromPosition(g_symbol,InpSignalTF,snap,g_state.trade);
+    if(snap.found)
+       XAU_RebuildTradeStateFromPosition(g_symbol,InpSignalTF,snap,g_state.trade);
 
-   g_state.last_signal_bar_time=signal_bar_time;
-   g_state.blocker_reason="";
-   g_last_logged_blocker="";
+    g_state.session_trades_used++;
+    g_state.last_signal_bar_time=signal_bar_time;
+    g_state.blocker_reason="";
+    g_last_logged_blocker="";
   }
 
 void OnTick()
@@ -359,6 +390,6 @@ void OnTick()
    double dd=0.0;
    XAU_GetATR(g_indicators,1,atr);
    XAU_IsSpreadAcceptable(g_symbol,MathMax(atr,0.00001),InpMaxSpreadATRFrac,spread);
-   dd=XAU_DailyDrawdownPct(g_state);
+   dd=XAU_DailyDrawdownPct(g_state,InpDailyLossUseEquity);
    XAU_UpdateChartPanel(InpEnableChartPanel,g_symbol,g_state,atr,spread,dd);
   }
